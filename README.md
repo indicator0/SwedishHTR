@@ -11,3 +11,5 @@
 3. Downlaod 3 Apptainer images (laypa.sif, htr.sif, tool.sif).
 [images](https://1drv.ms/f/s!AhLc1l9ln_UugvEGg39WPvRkaehvdg?e=lnt6hl)
 4. Edit certain directories in shell scripts like apptainer-pipe.sh into model files in your system.
+5. To try the model, use apptainer-pipe.sh and put images you want to process into the *image* folder
+6. Run apptainer-pipe.sh, and after running it, you should expect to see a *page* folder inside *image* folder, where you can find pairs of baseline detection results and transcribing results.
