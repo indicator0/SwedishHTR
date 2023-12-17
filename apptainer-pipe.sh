@@ -1,25 +1,22 @@
 #!/bin/bash
 set -e
+# This script is for inference
+
 
 VERSION=1.2.10
 # Stop on error, if set to 1 will exit program if any of the docker commands fail
 set -e
 STOPONERROR=1
 
-# set to 1 if you want to enable, 0 otherwise, select just one
+# enable the baseline detection, 0 for disablle
 BASELINELAYPA=1
 
-#
-#LAYPAMODEL=/home/rutger/src/laypa-models/general/baseline/config.yaml
-#LAYPAMODELWEIGHTS=/home/rutger/src/laypa-models/general/baseline/model_best_mIoU.pth
 
 LAYPAMODEL=/cephyr/users/zhihaoy/Alvis/Downloads/config.yaml
 LAYPAMODELWEIGHTS=/cephyr/users/zhihaoy/Alvis/Downloads/model_best_mIoU.pth
 
-# set to 1 if you want to enable, 0 otherwise, select just one
+# enable the HTR transcribing, 0 for disable (of course we want!)
 HTRLOGHI=1
-
-#HTRLOGHIMODEL=/home/rutger/src/loghi-htr-models/republic-2023-01-02-base-generic_new14-2022-12-20-valcer-0.0062
 HTRLOGHIMODEL=/cephyr/users/zhihaoy/Alvis/loghi/best_val_nov30
 
 # set this to 1 for recalculating reading order, line clustering and cleaning.
@@ -32,21 +29,18 @@ RECALCULATEREADINGORDERCLEANBORDERS=0
 RECALCULATEREADINGORDERTHREADS=4
 
 #detect language of pagexml, set to 1 to enable, disable otherwise
-DETECTLANGUAGE=1
+DETECTLANGUAGE=0
 #interpolate word locations
 SPLITWORDS=1
 #BEAMWIDTH: higher makes results slightly better at the expense of lot of computation time. In general don't set higher than 10
-BEAMWIDTH=1
+BEAMWIDTH=2
 #used gpu ids, set to "-1" to use CPU, "0" for first, "1" for second, etc
 GPU=0
 
-DOCKERLOGHITOOLING=docker://loghi/docker.loghi-tooling:$VERSION
-DOCKERLAYPA=docker://loghi/docker.laypa:$VERSION
-DOCKERLOGHIHTR=docker://loghi/docker.htr:$VERSION
 USE2013NAMESPACE=" -use_2013_namespace "
 
-# DO NO EDIT BELOW THIS LINE
-if [ -z $1 ]; then echo "please provide path to images to be HTR-ed" && exit 1; fi;
+# Something real
+if [ -z $1 ]; then echo "Please provide the path to images to be HTR-ed" && exit 1; fi;
 tmpdir=$(mktemp -d)
 echo $tmpdir
 
@@ -68,8 +62,8 @@ find $SRC -name '*.done' -exec rm -f "{}" \;
 
 if [[ $BASELINELAYPA -eq 1 ]]
 then
-        echo "starting Laypa baseline detection"
-
+        echo "Starting Laypa baseline detection"
+        # inference baseline of input images with Laypa
         input_dir=$SRC
         output_dir=$SRC
         LAYPADIR="$(dirname "${LAYPAMODEL}")"
@@ -114,9 +108,8 @@ fi
 # #HTR option 1 LoghiHTR
 if [[ $HTRLOGHI -eq 1 ]]
 then
-
+        # cut the big image into small pieces to transcribe
         echo "starting Loghi HTR"
-        # #pylaia takes 3 channels, rutgerhtr 4channels png or 3 with new models
        apptainer exec tool.sif /src/loghi-tooling/minions/target/appassembler/bin/MinionCutFromImageBasedOnPageXMLNew \
        -input_path $SRC \
        -outputbase $tmpdir/imagesnippets/ \
@@ -133,9 +126,7 @@ then
        find $tmpdir/imagesnippets/ -type f -name '*.png' > $tmpdir/lines.txt
 
 	LOGHIDIR="$(dirname "${HTRLOGHIMODEL}")"
-        # CUDA_VISIBLE_DEVICES=-1 python3 ~/src/htr/src/main.py --do_inference --channels 4 --height $HTR_LOGHI_MODEL_HEIGHT --existing_model ~/src/htr/$HTR_LOGHI_MODEL  --batch_size 32 --use_mask --inference_list $tmpdir/lines.txt --results_file $tmpdir/results.txt --charlist ~/src/htr/$HTR_LOGHI_MODEL.charlist --gpu $GPU
-#        apptainer run $DOCKERGPUPARAMS --rm -m 32000m --shm-size 10240m -ti -v $tmpdir:$tmpdir docker.htr python3 /src/src/main.py --do_inference --channels 4 --height $HTRLOGHIMODELHEIGHT --existing_model /src/loghi-htr-models/$HTRLOGHIMODEL  --batch_size 10 --use_mask --inference_list $tmpdir/lines.txt --results_file $tmpdir/results.txt --charlist /src/loghi-htr-models/$HTRLOGHIMODEL.charlist --gpu $GPU --output $tmpdir/output/ --config_file_output $tmpdir/output/config.txt --beam_width 10
-        apptainer run --nv htr.sif \
+        # running loghi htr model and inference small image pieces
 	bash -c "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 python3 /src/loghi-htr/src/main.py \
         --do_inference \
         --existing_model $HTRLOGHIMODEL  \

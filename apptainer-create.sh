@@ -17,10 +17,10 @@ outputdir=$(realpath $2/)
 filelist=$outputdir/training_all.txt
 filelisttrain=$outputdir/training_all_train.txt
 filelistval=$outputdir/training_all_val.txt
-#90 percent for training
+#training set split percentage, 90 for training, 10 for validating
 trainsplit=90
 DOCKERLOGHITOOLING=loghi/docker.loghi-tooling:$VERSION
-INCLUDETEXTSTYLES=" -include_text_styles " # translate the text styles defined in transkribus to loghi htr training data with text styles
+INCLUDETEXTSTYLES=" -include_text_styles " # for further detect different text styles
 SKIP_UNCLEAR=" -skip_unclear " # skip all lines that have a tag unclear
 
 echo $inputdir
@@ -30,13 +30,7 @@ echo $filelisttrain
 echo $filelistval
 
 find $inputdir -name '*.done' -exec rm {} \;
-
-echo "inputfiles: " `find $inputdir|wc -l`
-
-
-#echo /home/rutger/src/opencvtest2/agenttesseract/target/appassembler/bin/MinionCutFromImageBasedOnPageXMLNew -input_path $inputdir -outputbase $outputdir -channels 4 -output_type png -write_text_contents -threads $numthreads
-#/home/rutger/src/opencvtest2/agenttesseract/target/appassembler/bin/MinionCutFromImageBasedOnPageXMLNew -input_path $inputdir -outputbase $outputdir -channels 4 -output_type png -write_text_contents -threads $numthreads
-
+# run apptainr image to process the images, cutting them into small pieces
 apptainer run tool.sif \
   /src/loghi-tooling/minions/target/appassembler/bin/MinionCutFromImageBasedOnPageXMLNew -input_path $inputdir -outputbase $outputdir -channels 4 -output_type png -write_text_contents -threads $numthreads $INCLUDETEXTSTYLES -no_page_update $SKIP_UNCLEAR -use_2013_namespace
 
@@ -50,10 +44,9 @@ do
         filename=$(basename -- "$input_path")
         filename="${filename%.*}"
         base="${input_path%.*}"
-#        text=`cat $base.box|colrm 2|tr -d '\n'`
         text=`cat $base.txt`
         echo -e "$input_path\t$text" >>$filelist
 done
 
-
+# suffule to generate training and validating set
 shuf $filelist | split -l $(( $(wc -l <$filelist) * $trainsplit / 100 )); mv xab $filelistval; mv xaa $filelisttrain
